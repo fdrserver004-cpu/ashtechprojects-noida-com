@@ -13,33 +13,27 @@ $name     = trim($_POST['FirstName'] ?? '');
 $email    = filter_var($_POST['EmailAddress'] ?? '', FILTER_VALIDATE_EMAIL);
 $phone    = trim($_POST['Phone'] ?? '');
 $countryCode = trim($_POST['COUNTRYCODE'] ?? '');
+$fullPhone = $countryCode . '-' . $phone;
 $project  = trim($_POST['mx_Project_Name'] ?? '');
 $location = trim($_POST['mx_City'] ?? '');
 $client   = trim($_POST['CLIENT'] ?? '');
 
-/* ===== FULL PHONE ===== */
 if ($countryCode !== '') {
-    $countryCode = ltrim($countryCode, '+');
-    $fullPhone = $countryCode . '-' . $phone;
+    $countryCode = ltrim($countryCode, '+'); 
+    $fullPhone = $countryCode . '-' . $phone; 
 } else {
-    $fullPhone = $phone;
+    $fullPhone = $phone; 
 }
 
-/* ===== VALIDATION ===== */
+/* ===== VALIDATION (DO NOT CHECK COUNTRY CODE) ===== */
+
 if (!$name || !$email || !$phone) {
     echo json_encode(['status' => 'error']);
     exit;
 }
 
-/* ================= AUTO PROJECT URL ================= */
 
-
-$projectUrl = $_SERVER['HTTP_REFERER'] ?? (
-    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://"
-) . $_SERVER['HTTP_HOST'] . "/";
-
-
-/* ================= CRM ================= */
+/* ================= CRM (ALWAYS ATTEMPT) ================= */
 
 $crmSuccess = false;
 
@@ -59,7 +53,7 @@ curl_setopt_array($ch, [
     CURLOPT_POSTFIELDS     => json_encode($crmData),
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_HTTPHEADER     => ["Content-Type: application/json"],
-    CURLOPT_TIMEOUT        => 5
+    CURLOPT_TIMEOUT        => 4
 ]);
 
 curl_exec($ch);
@@ -76,18 +70,9 @@ $ip = explode(',', $ip)[0];
 $geo = ['country' => 'Unknown', 'region' => 'Unknown', 'city' => 'Unknown'];
 
 if (!in_array($ip, ['127.0.0.1', '::1'], true)) {
-
-    $geoCurl = curl_init("https://ipwho.is/{$ip}");
-    curl_setopt_array($geoCurl, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 3
-    ]);
-
-    $geoResponse = curl_exec($geoCurl);
-    curl_close($geoCurl);
-
-    if ($geoResponse) {
-        $g = json_decode($geoResponse, true);
+    $geoRes = @file_get_contents("https://ipwho.is/{$ip}");
+    if ($geoRes) {
+        $g = json_decode($geoRes, true);
         if (!empty($g['success'])) {
             $geo['country'] = $g['country'] ?? 'Unknown';
             $geo['region']  = $g['region'] ?? 'Unknown';
@@ -114,8 +99,8 @@ function create_jwt($payload, $privateKey) {
 }
 
 /*
-Excel Columns:
-Date | Name | Email | Phone | Project | Location | IP | Country | Region | City | Client | CRM Status | URL
+Excel column order:
+Date | Name | Email | Phone | Project | Location | IP | Country | Region | City | Client | crm-status
 */
 
 $sheetRow = [
@@ -130,8 +115,7 @@ $sheetRow = [
     $geo['region'],
     $geo['city'],
     $client,
-    $crmSuccess ? 'SUCCESS' : 'FAILED',
-    $projectUrl
+    $crmSuccess ? 'SUCCESS' : 'FAILED'
 ];
 
 $spreadsheetId = "1_3xJfI4wh-Zx3liNjSC3oRl157qSp99J6-fKDfuoRZ8";
@@ -150,8 +134,6 @@ $payload = [
 
 $jwt = create_jwt($payload, $privateKey);
 
-/* ===== GET ACCESS TOKEN ===== */
-
 $tokenCurl = curl_init("https://oauth2.googleapis.com/token");
 curl_setopt_array($tokenCurl, [
     CURLOPT_RETURNTRANSFER => true,
@@ -160,13 +142,11 @@ curl_setopt_array($tokenCurl, [
         "grant_type" => "urn:ietf:params:oauth:grant-type:jwt-bearer",
         "assertion"  => $jwt
     ]),
-    CURLOPT_TIMEOUT        => 5
+    CURLOPT_TIMEOUT        => 4
 ]);
 
 $tokenResponse = json_decode(curl_exec($tokenCurl), true);
 curl_close($tokenCurl);
-
-/* ===== APPEND TO SHEET ===== */
 
 if (!empty($tokenResponse['access_token'])) {
 
@@ -181,25 +161,12 @@ if (!empty($tokenResponse['access_token'])) {
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode(['values' => [$sheetRow]]),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 5
+        CURLOPT_TIMEOUT        => 4
     ]);
 
     curl_exec($sheetCurl);
     curl_close($sheetCurl);
 }
-
-/* ================= LOG FILE ================= */
-
-$log_file = __DIR__ . '/leads.txt';
-
-$log_entry = "[" . date('Y-m-d H:i:s') . "] "
-    . "Name: $name | "
-    . "Email: $email | "
-    . "Phone: $fullPhone | "
-    . "Project: $project | "
-    . "URL: $projectUrl\n";
-
-file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
 
 /* ================= FINAL RESPONSE ================= */
 
