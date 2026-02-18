@@ -4,30 +4,30 @@
 // slick slider -------------------------------------------------------------------------------->
 
 $(document).ready(function () {
-  // $('.img_banner').slick({
-  //   slidesToShow: 1,
-  //   slidesToScroll: 1,
-  //   arrows: false,
-  //   dots: true,
-  //   speed: 500,
-  //   infinite: true,
-  //   autoplaySpeed: 1500,
-  //   autoplay: true,
-  //   responsive: [
-  //     {
-  //       breakpoint: 991,
-  //       settings: {
-  //         slidesToShow: 1,
-  //       }
-  //     },
-  //     {
-  //       breakpoint: 767,
-  //       settings: {
-  //         slidesToShow: 1,
-  //       }
-  //     }
-  //   ]
-  // });
+  $('.img_banner').slick({
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    arrows: false,
+    dots: true,
+    speed: 500,
+    infinite: true,
+    autoplaySpeed: 1500,
+    autoplay: true,
+    responsive: [
+      {
+        breakpoint: 991,
+        settings: {
+          slidesToShow: 1,
+        }
+      },
+      {
+        breakpoint: 767,
+        settings: {
+          slidesToShow: 1,
+        }
+      }
+    ]
+  });
 
 
   window.addEventListener("load", () => {
